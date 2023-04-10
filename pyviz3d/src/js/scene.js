@@ -438,24 +438,80 @@ function get_ground(){
 
 
 
+
 function init_gui(objects){
+
 	let menuMap = new Map();
 	for (const [name, value] of Object.entries(objects)){
-		let splits = name.split(';');
+		// 1st split with ';' to get group
+		let splits = name.split(';')
 		if (splits.length > 1) {
+			// Create a folder with the group name (the string before ';')
 			let folder_name = splits[0];
 			if (!menuMap.has(folder_name)) {
 				menuMap.set(folder_name, gui.addFolder(folder_name));
 			}
 			let fol = menuMap.get(folder_name);
 			fol.add(value, 'visible').name(splits[1]).onChange(render);
-			fol.open();
+			fol.close();
 		} else {
-			if (value.name.localeCompare('labels') != 0) {
-				gui.add(value, 'visible').name(name).onChange(render);
+			gui.add(value, 'visible').name(name).onChange(render);
+		}
+
+		// 2nd split with ',' to get frame id and initialize a slider for each group
+		let splits2 = name.split(',');
+		if (splits2.length > 1) {
+			let folder_name = splits2[0]
+			let frame_id = parseInt (splits2 [1]) // Frame id is after the first ','
+			if (!(folder_name in slider_objects)) {
+				// Each slider has frame_id (current frame id) that can be changed by onChange() and max_frame (max frame range)
+				slider_objects [folder_name] = {
+					frame_id: 0,
+					max_frame: 0,
+				}
+			}
+
+			// Slider range is from 0 to max of seen frame id
+			slider_objects [folder_name].max_frame = Math.max (slider_objects [folder_name].max_frame, frame_id);
+		}
+	}
+
+	// Add control to the slider to control the active frame 
+	for (const [name, value] of Object.entries(objects)){
+		let splits2 = name.split(',');
+		if (splits2.length > 1) {
+			let folder_name = splits2[0]
+			let frame_id = parseInt (splits2 [1])
+			if (!(folder_name in slider_added)) {
+				// Assign select_frame for the slider, default frame id is 0
+				// select_frame() changes frame_id of the slider
+				console.log('add slider')
+				gui.add(slider_objects[folder_name], 'frame_id', 0, slider_objects[folder_name].max_frame, 1).name(folder_name).onChange(select_frame);
+				slider_added [folder_name] = true;
+				console.log (folder_name)
 			}
 		}
 	}
+}
+
+function select_frame() {
+	// For each object
+	for (const [name, value] of Object.entries(threejs_objects)){
+		let splits = name.split(',')
+		if (splits.length > 1) {
+			let folder_name = splits[0]
+			let frame_id = parseInt (splits [1])
+
+			// if the object's frame_id != object's slider.frame_id, set visible to False, else set to True
+			if (slider_objects[folder_name].frame_id == frame_id) {
+				threejs_objects [name].visible = true;
+			}
+			else {
+				threejs_objects [name].visible = false;
+			}
+		}
+	}
+	render ()
 }
 
 function render() {
@@ -604,10 +660,12 @@ let raycaster;
 let intersection = null;
 let mouse = new THREE.Vector2();
 
-const gui = new GUI({autoPlace: true, width: 120});
+const gui = new GUI({autoPlace: true, width: 400});
 
 // dict containing all objects of the scene
 let threejs_objects = {};
+let slider_objects = {};
+let slider_added = {};
 
 init();
 
