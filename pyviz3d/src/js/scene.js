@@ -1,19 +1,11 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { OBJLoader } from     'three/addons/loaders/OBJLoader.js';
-import { GUI } from           'three/addons/libs/lil-gui.module.min.js';
-import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import * as THREE from 'https://threejsfundamentals.org/threejs/resources/threejs/r112/build/three.module.js';
+import {GUI} from 'https://threejsfundamentals.org/3rdparty/dat.gui.module.js';
+import {OrbitControls} from 'https://threejsfundamentals.org/threejs/resources/threejs/r112/examples/jsm/controls/OrbitControls.js';
+import {OBJLoader} from 'https://threejsfundamentals.org/threejs/resources/threejs/r127/examples/jsm/loaders/OBJLoader.js';
+
 
 let num_objects_curr = 0;
 let num_objects = 100;
-
-
-const layers = {
-	'Toggle Name': function () {
-		console.log('toggle')
-		camera.layers.toggle(0);
-	}
-}
 
 function onDoubleClick(event) {
 	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
@@ -21,6 +13,7 @@ function onDoubleClick(event) {
 	raycaster.setFromCamera( mouse, camera );
 	let intersections = raycaster.intersectObjects( [ threejs_objects['scene0451_01'] ] );
 	intersection = ( intersections.length ) > 0 ? intersections[ 0 ] : null;
+	//console.log(objs);
 	console.log(intersections);
 }
 
@@ -36,14 +29,17 @@ function get_lines(properties){
         positions = new Float32Array(buffer, 0, 3 * num_lines * 2);
         let colors_uint8 = new Uint8Array(buffer, (3 * num_lines * 2) * 4, 3 * num_lines * 2);
         let colors_float32 = Float32Array.from(colors_uint8);
-        for (let i=0; i<colors_float32.length; i++) {
+        for(let i=0; i<colors_float32.length; i++) {
          	colors_float32[i] /= 255.0;
         }
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors_float32, 3));
+
     }).then(step_progress_bar).then(render);
+
 	var material = new THREE.LineBasicMaterial({color: 0xFFFFFF, vertexColors: true});
 	return new THREE.LineSegments( geometry, material );
+
 }
 
 function get_cube(){
@@ -152,22 +148,6 @@ function get_points(properties){
 	return points
 }
 
-function get_labels(properties){
-	const labels = new THREE.Group();
-	labels.name = "labels"
-	for (let i=0; i<properties['labels'].length; i++){
-		const labelDiv = document.createElement('div');
-		labelDiv.className = 'label';
-		labelDiv.style.color = "rgb("+properties['colors'][i][0]+", "+properties['colors'][i][1]+", "+properties['colors'][i][2]+")"; 
-		labelDiv.textContent = properties['labels'][i];
-	
-		const label_2d = new CSS2DObject(labelDiv);
-		label_2d.position.set(properties['positions'][i][0], properties['positions'][i][1], properties['positions'][i][2]);
-		labels.add(label_2d);
-	}
-	return labels
-}
-
 function get_obj(properties){
 	var container = new THREE.Object3D();
 	function loadModel(object) {
@@ -179,6 +159,7 @@ function get_obj(properties){
 				let b = properties['color'][2]
 				let colorString = "rgb("+r+","+g+", "+b+")"
 				child.material.color.set(new THREE.Color(colorString));
+				console.log('setting colors ' + r + " " + g + " " + b)
 			}
 		});
 		object.translateX(properties['translation'][0])
@@ -210,56 +191,31 @@ function get_obj(properties){
 	return container
 }
 
-function get_material(alpha){
+function get_cuboid(properties){
+	const radius_top = properties['edge_width']
+	const radius_bottom = properties['edge_width']
+	const radial_segments = 30
+	const height = 1
+	let geometry = new THREE.CylinderGeometry(radius_top, radius_bottom, height, radial_segments);
+	for (let i=0; i<geometry.faces.length; i++){
+		const r = properties['color'][0]
+		const g = properties['color'][1]
+		const b = properties['color'][2]
+		for (let j=0; j<3; j++){
+			geometry.faces[i].vertexColors[j] = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+		}
+	}
+
 	let uniforms = {
-		alpha: {value: alpha},
+		alpha: {value: properties['alpha']},
 		shading_type: {value: 1},
 	};
-	let material = new THREE.ShaderMaterial({
-		uniforms:       uniforms,
-		vertexShader:   document.getElementById('vertexshader').textContent,
-		fragmentShader: document.getElementById('fragmentshader').textContent,
-		transparent:    true,
-    });
-    return material;
-}
-
-function set_geometry_vertex_color(geometry, color){
-	const r = Math.fround(color[0] / 255.0);
-	const g = Math.fround(color[1] / 255.0);
-	const b = Math.fround(color[2] / 255.0);
-	const num_vertices = geometry.getAttribute('position').count;
-	const colors = new Float32Array(num_vertices * 3);
-	for (let i = 0; i < num_vertices; i++){
-		colors[3 * i + 0] = r;
-		colors[3 * i + 1] = g;
-		colors[3 * i + 2] = b;
-	}
-	geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-}
-
-function get_cylinder_geometry(radius_top, radius_bottom, height, radial_segments, color){
-	let geometry = new THREE.CylinderGeometry(radius_top, radius_bottom, height, radial_segments);
-	set_geometry_vertex_color(geometry, color)
-	return geometry;
-}
-
-function get_sphere_geometry(radius, widthSegments, heightSegments, color){
-	const geometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
-	set_geometry_vertex_color(geometry, color);
-	return geometry;
-}
-
-function get_cuboid(properties){
-	const radius_top = properties['edge_width'];
-	const radius_bottom = properties['edge_width'];
-	const radial_segments = 30;
-	const height = 1;
-	
-	let geometry = get_cylinder_geometry(
-		radius_top, radius_bottom, height, radial_segments,
-		properties['color']);
-	let material = get_material(properties['alpha']);
+	let material = new THREE.ShaderMaterial( {
+		 uniforms:       uniforms,
+    	 vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+	     fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+		 transparent:    true,
+	 });
 
 	const cylinder_x = new THREE.Mesh(geometry, material);
 	cylinder_x.scale.set(1.0, properties['size'][0], 1.0)
@@ -296,9 +252,16 @@ function get_cuboid(properties){
 	const cylinder_13 = cylinder_z.clone()
 	cylinder_13.position.set(properties['size'][0]/2.0, properties['size'][1]/2.0, 0.0)
 
-	let corner_geometry = get_sphere_geometry(properties['edge_width'], 30, 30, properties['color']);
-
-	const sphere = new THREE.Mesh(corner_geometry, material);
+	const corner_geometry = new THREE.SphereGeometry(properties['edge_width'], 30, 30);
+	for (let i=0; i<corner_geometry.faces.length; i++){
+		const r = properties['color'][0]
+		const g = properties['color'][1]
+		const b = properties['color'][2]
+		for (let j=0; j<3; j++){
+			corner_geometry.faces[i].vertexColors[j] = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+		}
+	}
+	const sphere = new THREE.Mesh(corner_geometry, material)
 	const corner_00 = sphere.clone()
 	corner_00.position.set(-properties['size'][0]/2.0, -properties['size'][1]/2.0, -properties['size'][2]/2.0)
 	const corner_01 = sphere.clone()
@@ -347,19 +310,50 @@ function get_cuboid(properties){
 			properties['orientation'][0])
 	cuboid.setRotationFromQuaternion(q)
 	cuboid.position.set(properties['position'][0], properties['position'][1], properties['position'][2])
+
 	return cuboid
+
 }
 
 function get_polyline(properties){
 	const radius_top = properties['edge_width']
 	const radius_bottom = properties['edge_width']
-	const radial_segments = 5;
-	const height = 1;
-	let material = get_material(properties['alpha']);
-	let geometry = get_cylinder_geometry(radius_top, radius_bottom, height, radial_segments, properties['color']);
+	const radial_segments = 5
+	const height = 1
+	let geometry = new THREE.CylinderGeometry(radius_top, radius_bottom, height, radial_segments);
+	for (let i=0; i<geometry.faces.length; i++){
+		const r = properties['color'][0]
+		const g = properties['color'][1]
+		const b = properties['color'][2]
+		for (let j=0; j<3; j++){
+			geometry.faces[i].vertexColors[j] = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+		}
+	}
+
+	let uniforms = {
+		alpha: {value: properties['alpha']},
+		shading_type: {value: 1},
+	};
+	let material = new THREE.ShaderMaterial( {
+		 uniforms:       uniforms,
+    	 vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+	     fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+		 transparent:    true,
+	 });
+
 	const cylinder = new THREE.Mesh(geometry, material);
-	let corner_geometry = get_sphere_geometry(properties['edge_width'], radial_segments, radial_segments, properties['color']);
-	const sphere = new THREE.Mesh(corner_geometry, material);
+
+	const corner_geometry = new THREE.SphereGeometry(properties['edge_width'], radial_segments, radial_segments);
+	for (let i=0; i<corner_geometry.faces.length; i++){
+		const r = properties['color'][0]
+		const g = properties['color'][1]
+		const b = properties['color'][2]
+		for (let j=0; j<3; j++){
+			corner_geometry.faces[i].vertexColors[j] = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+		}
+	}
+	const sphere = new THREE.Mesh(corner_geometry, material)
+
 	const polyline = new THREE.Group();
 
 	// Add first corner to the polyline
@@ -396,19 +390,50 @@ function get_polyline(properties){
 }
 
 function get_arrow(properties){
-	const radius_top = 0.0;
-	const radius_bottom = properties['head_width'];
-	const radial_segments = 15;
-	const height = radius_bottom * 2.0;
+
+	// Arrow head
+	const radius_top = 0.0
+	const radius_bottom = properties['head_width']
+	const radial_segments = 15
+	const height = radius_bottom * 2.0
 
 	var dist_x = properties['end'][0] - properties['start'][0]
 	var dist_y = properties['end'][1] - properties['start'][1]
 	var dist_z = properties['end'][2] - properties['start'][2]
 	var margnitude = Math.sqrt(dist_x*dist_x + dist_y*dist_y + dist_z*dist_z)
 
-	let material = get_material(properties['alpha']);
-	let geometry = get_cylinder_geometry(radius_top, radius_bottom, height, radial_segments, properties['color']);
-	let geometry_stroke = get_cylinder_geometry(properties['stroke_width'], properties['stroke_width'], margnitude - height, radial_segments, properties['color']);
+	let geometry = new THREE.CylinderGeometry(radius_top, radius_bottom, height, radial_segments);
+	for (let i=0; i<geometry.faces.length; i++){
+		const r = properties['color'][0]
+		const g = properties['color'][1]
+		const b = properties['color'][2]
+		for (let j=0; j<3; j++){
+			geometry.faces[i].vertexColors[j] = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+		}
+	}
+
+	const stroke_width = properties['stroke_width']
+	let geometry_stroke = new THREE.CylinderGeometry(stroke_width, stroke_width, margnitude - height, radial_segments);
+	for (let i=0; i<geometry_stroke.faces.length; i++){
+		const r = properties['color'][0]
+		const g = properties['color'][1]
+		const b = properties['color'][2]
+		for (let j=0; j<3; j++){
+			geometry_stroke.faces[i].vertexColors[j] = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+		}
+	}
+
+	let uniforms = {
+		alpha: {value: properties['alpha']},
+		shading_type: {value: 1},
+	};
+
+	let material = new THREE.ShaderMaterial( {
+		 uniforms:       uniforms,
+    	 vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+	     fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+		 transparent:    true,
+	 });
 
 	const arrow_head = new THREE.Mesh(geometry, material);
 	arrow_head.translateY(margnitude - height / 2.0)
@@ -436,37 +461,92 @@ function get_ground(){
 	return mesh;
 }
 
-
-
 function init_gui(objects){
+
 	let menuMap = new Map();
 	for (const [name, value] of Object.entries(objects)){
-		let splits = name.split(';');
+		// 1st split with ';' to get group
+		let splits = name.split(';')
 		if (splits.length > 1) {
+			// Create a folder with the group name (the string before ';')
 			let folder_name = splits[0];
 			if (!menuMap.has(folder_name)) {
 				menuMap.set(folder_name, gui.addFolder(folder_name));
 			}
 			let fol = menuMap.get(folder_name);
 			fol.add(value, 'visible').name(splits[1]).onChange(render);
-			fol.open();
+			fol.close();
 		} else {
-			if (value.name.localeCompare('labels') != 0) {
-				gui.add(value, 'visible').name(name).onChange(render);
+			gui.add(value, 'visible').name(name).onChange(render);
+		}
+
+		// 2nd split with ',' to get frame id and initialize a slider for each group
+		let splits2 = name.split(',');
+		if (splits2.length > 1) {
+			let folder_name = splits2[0]
+			let frame_id = parseInt (splits2 [1]) // Frame id is after the first ','
+			if (!(folder_name in slider_objects)) {
+				// Each slider has frame_id (current frame id) that can be changed by onChange() and max_frame (max frame range)
+				slider_objects [folder_name] = {
+					frame_id: 0,
+					max_frame: 0,
+				}
+			}
+
+			// Slider range is from 0 to max of seen frame id
+			slider_objects [folder_name].max_frame = Math.max (slider_objects [folder_name].max_frame, frame_id);
+		}
+	}
+
+	// Add control to the slider to control the active frame 
+	for (const [name, value] of Object.entries(objects)){
+		let splits2 = name.split(',');
+		if (splits2.length > 1) {
+			let folder_name = splits2[0]
+			let frame_id = parseInt (splits2 [1])
+			if (!(folder_name in slider_added)) {
+				// Assign select_frame for the slider, default frame id is 0
+				// select_frame() 
+				console.log('add slider')
+				gui.add(slider_objects[folder_name], 'frame_id', 0, slider_objects[folder_name].max_frame, 1).name(folder_name).onChange(select_frame);
+				slider_added [folder_name] = true;
+				console.log (folder_name)
 			}
 		}
 	}
 }
 
+
+function select_frame() {
+	// For each object
+	for (const [name, value] of Object.entries(threejs_objects)){
+		let splits = name.split(',')
+		if (splits.length > 1) {
+			let folder_name = splits[0]
+			let frame_id = parseInt (splits [1])
+
+			// if the object's frame_id != object's slider.frame_id, set visible to False, else set to True
+			if (slider_objects[folder_name].frame_id == frame_id) {
+				threejs_objects [name].visible = true;
+			}
+			else {
+				threejs_objects [name].visible = false;
+			}
+		}
+	}
+	render ()
+}
+
 function render() {
+	// for (const [name, value] of Object.entries(objects)) {
+	// 	object[name]['visible'] = true;
+	// }
     renderer.render(scene, camera);
-	labelRenderer.render(scene, camera);
 }
 
 function init(){
 	scene.background = new THREE.Color(0xffffff);
 	renderer.setSize(window.innerWidth, window.innerHeight);
-	labelRenderer.setSize(window.innerWidth, window.innerHeight);
 
 	let hemiLight = new THREE.HemisphereLight( 0xffffff, 0x444444 );
 	hemiLight.position.set(0, 20, 0);
@@ -485,6 +565,7 @@ function init(){
 
 	let intensity = 0.5;
 	let color = 0xffffff;
+	
 	const spotLight1 = new THREE.SpotLight(color, intensity);
 	spotLight1.position.set(100, 1000, 0);
 	scene.add(spotLight1);
@@ -524,11 +605,6 @@ function create_threejs_objects(properties){
 			threejs_objects[object_name] = get_points(object_properties);
     		render();
 		}
-		if (String(object_properties['type']).localeCompare('labels') == 0){
-			threejs_objects[object_name] = get_labels(object_properties);
-			step_progress_bar();
-			render();
-		}
 		if (String(object_properties['type']).localeCompare('lines') == 0){
 			threejs_objects[object_name] = get_lines(object_properties);
     		render();
@@ -551,13 +627,12 @@ function create_threejs_objects(properties){
 			step_progress_bar();
 			render();
 		}
+		console.log(object_name)
 		threejs_objects[object_name].visible = object_properties['visible'];
 		threejs_objects[object_name].frustumCulled = false;
 	}
-	
 	// Add axis helper
 	threejs_objects['Axis'] = new THREE.AxesHelper(1);
-
 	render();
 }
 
@@ -571,32 +646,22 @@ function onWindowResize(){
     const innerWidth = window.innerWidth
     const innerHeight = window.innerHeight;
     renderer.setSize(innerWidth, innerHeight);
-    labelRenderer.setSize(innerWidth, innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     render();
 }
 
 function update_controls(){
-	controls = new OrbitControls(camera, labelRenderer.domElement);
+	controls = new OrbitControls(camera, renderer.domElement);
 	controls.addEventListener("change", render);
 	controls.enableKeys = true;
 	controls.enablePan = true; // enable dragging
 }
 
 const scene = new THREE.Scene();
-
 const renderer = new THREE.WebGLRenderer({antialias: true});
-document.getElementById('render_container').appendChild(renderer.domElement)
-
 var camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.01, 1000);
 var controls = '';
-
-let labelRenderer = new CSS2DRenderer();
-labelRenderer.setSize( window.innerWidth, window.innerHeight );
-labelRenderer.domElement.style.position = 'absolute';
-labelRenderer.domElement.style.top = '0px';
-document.getElementById('render_container').appendChild(labelRenderer.domElement)
 
 window.addEventListener('resize', onWindowResize, false);
 
@@ -604,10 +669,18 @@ let raycaster;
 let intersection = null;
 let mouse = new THREE.Vector2();
 
-const gui = new GUI({autoPlace: true, width: 120});
+const gui = new GUI({autoPlace: true, width: 400});
+// const gui = new GUI();
+let frame = {
+	number : 0
+};
+
+document.getElementById('render_container').appendChild(renderer.domElement)
 
 // dict containing all objects of the scene
 let threejs_objects = {};
+let slider_objects = {};
+let slider_added = {};
 
 init();
 
@@ -615,9 +688,10 @@ init();
 fetch('nodes.json')
 	.then(response => {add_progress_bar(); return response;})
     .then(response => {return response.json();})
-    // .then(json_response => {console.log(json_response); return json_response})
+    .then(json_response => {console.log(json_response); return json_response})
     .then(json_response => create_threejs_objects(json_response))
     .then(() => add_threejs_objects_to_scene(threejs_objects))
     .then(() => init_gui(threejs_objects))
-	.then(() => console.log('Done'))
-	.then(render);
+	.then(() => console.log('done'))
+	.then(render)
+	.then(() => console.log('hiding progress bar'));
